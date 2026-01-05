@@ -1,0 +1,276 @@
+'use client';
+
+import { useState } from 'react';
+import FileUpload from '@/components/FileUpload';
+import PDFViewer from '@/components/PDFViewer';
+import ATSDisplay from '@/components/ATSDisplay';
+import GradingSection from '@/components/GradingSection';
+import type { AnalysisResult, AnalyzeResponse } from '@/types';
+
+export default function Home() {
+  const [file, setFile] = useState<File | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [error, setError] = useState<string>('');
+
+  const handleFileSelect = async (selectedFile: File) => {
+    setFile(selectedFile);
+    setError('');
+    setAnalysisResult(null);
+
+    // Start analysis
+    await analyzeResume(selectedFile);
+  };
+
+  const analyzeResume = async (fileToAnalyze: File) => {
+    setIsAnalyzing(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', fileToAnalyze);
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data: AnalyzeResponse = await response.json();
+
+      if (!data.success || !data.data) {
+        throw new Error(data.error || 'Failed to analyze resume');
+      }
+
+      setAnalysisResult(data.data);
+    } catch (err) {
+      console.error('Error analyzing resume:', err);
+      setError(err instanceof Error ? err.message : 'Failed to analyze resume. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const downloadFeedback = () => {
+    if (!analysisResult) return;
+
+    let text = 'RESUME ANALYSIS FEEDBACK\n';
+    text += '='.repeat(50) + '\n\n';
+
+    // Critical Issues
+    if (analysisResult.criticalIssues.length > 0) {
+      text += 'CRITICAL ISSUES:\n';
+      text += '-'.repeat(50) + '\n';
+      analysisResult.criticalIssues.forEach((issue, i) => {
+        text += `${i + 1}. ${issue}\n`;
+      });
+      text += '\n';
+    }
+
+    // Missing Sections
+    if (analysisResult.missingRequiredSections.length > 0) {
+      text += 'MISSING REQUIRED SECTIONS:\n';
+      text += '-'.repeat(50) + '\n';
+      analysisResult.missingRequiredSections.forEach((section, i) => {
+        text += `${i + 1}. ${section}\n`;
+      });
+      text += '\n';
+    }
+
+    // Grades and Feedback
+    text += 'DETAILED ANALYSIS:\n';
+    text += '='.repeat(50) + '\n\n';
+
+    analysisResult.grades.forEach((grade, index) => {
+      text += `${index + 1}. ${grade.dimension.toUpperCase()}\n`;
+      text += `   Score: ${grade.score}/10\n\n`;
+
+      if (grade.feedback) {
+        text += `   Overview:\n   ${grade.feedback}\n\n`;
+      }
+
+      if (grade.issues && grade.issues.length > 0) {
+        text += `   Issues:\n`;
+        grade.issues.forEach((issue) => {
+          text += `   • ${issue}\n`;
+        });
+        text += '\n';
+      }
+
+      if (grade.suggestions && grade.suggestions.length > 0) {
+        text += `   Suggestions:\n`;
+        grade.suggestions.forEach((suggestion) => {
+          text += `   ✓ ${suggestion}\n`;
+        });
+        text += '\n';
+      }
+
+      text += '-'.repeat(50) + '\n\n';
+    });
+
+    // Create and download file
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'resume-analysis-feedback.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleReset = () => {
+    setFile(null);
+    setAnalysisResult(null);
+    setError('');
+  };
+
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Resume Analyzer
+              </h1>
+              <p className="text-gray-600 mt-1">
+                AI-powered ATS compatibility and quality assessment
+              </p>
+            </div>
+            {analysisResult && (
+              <button
+                onClick={handleReset}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-semibold"
+              >
+                Analyze New Resume
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Upload Section */}
+        {!file && !analysisResult && (
+          <div className="max-w-2xl mx-auto">
+            <FileUpload onFileSelect={handleFileSelect} disabled={isAnalyzing} />
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="max-w-2xl mx-auto mb-6">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <svg className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="font-semibold text-red-800">Error</h3>
+                  <p className="text-red-700 mt-1">{error}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isAnalyzing && (
+          <div className="max-w-2xl mx-auto text-center py-12">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary-600 mx-auto mb-4"></div>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+              Analyzing your resume...
+            </h2>
+            <p className="text-gray-600">
+              This may take 10-30 seconds. We're extracting text, running ATS analysis, and evaluating your resume across 7 dimensions.
+            </p>
+          </div>
+        )}
+
+        {/* Results Section */}
+        {analysisResult && !isAnalyzing && (
+          <div className="space-y-8">
+            {/* Critical Issues Alert */}
+            {analysisResult.criticalIssues.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                <h2 className="text-xl font-bold text-red-800 mb-4 flex items-center gap-2">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  Critical Issues
+                </h2>
+                <ul className="space-y-2">
+                  {analysisResult.criticalIssues.map((issue, index) => (
+                    <li key={index} className="flex gap-2">
+                      <span className="text-red-600 flex-shrink-0">•</span>
+                      <span className="text-red-900">{issue}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Two-Panel Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Panel - PDF Viewer */}
+              <div className="bg-white rounded-lg shadow-lg p-4">
+                <h2 className="text-xl font-bold text-gray-800 mb-4">
+                  Original Resume
+                </h2>
+                <div className="h-[600px]">
+                  <PDFViewer file={file} />
+                </div>
+              </div>
+
+              {/* Right Panel - ATS Extraction */}
+              <div className="bg-white rounded-lg shadow-lg p-4">
+                <h2 className="text-xl font-bold text-gray-800 mb-4">
+                  ATS Extraction
+                </h2>
+                <div className="h-[600px]">
+                  <ATSDisplay data={analysisResult.atsData} />
+                </div>
+              </div>
+            </div>
+
+            {/* Download Button */}
+            <div className="text-center">
+              <button
+                onClick={downloadFeedback}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold shadow-lg"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download Feedback as Text File
+              </button>
+            </div>
+
+            {/* Grading Sections */}
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">
+                Detailed Analysis (7 Dimensions)
+              </h2>
+              <div className="space-y-4">
+                {analysisResult.grades.map((grade, index) => (
+                  <GradingSection key={index} dimension={grade} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-200 mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <p className="text-center text-gray-600 text-sm">
+            Powered by Claude AI • Built with Next.js and Tailwind CSS
+          </p>
+        </div>
+      </footer>
+    </main>
+  );
+}
