@@ -111,43 +111,120 @@ function createSmartFallbackATSData(text: string): ATSData {
   const lines = text.split('\n').filter(line => line.trim().length > 0);
   const name = lines[0]?.trim() || 'Not detected';
 
-  // Extract skills (look for skills section)
+  // Extract skills (improved to capture more technical terms)
   const skills: string[] = [];
-  const skillsMatch = text.match(/skills?:?\s*([^\n]+(?:\n(?!\n)[^\n]+)*)/i);
+  const skillsMatch = text.match(/skills?[:\s]*\n?([\s\S]*?)(?=\n(?:education|experience|professional|work|projects|extracurricular|summary|certifications|$))/im);
+
   if (skillsMatch) {
     const skillsText = skillsMatch[1];
-    const commonSkills = skillsText.match(/\b(?:JavaScript|TypeScript|Python|Java|React|Node\.js|SQL|AWS|Docker|Git|HTML|CSS|C\+\+|Ruby|Go|Rust|Swift|Kotlin|PHP|R|Scala|MongoDB|PostgreSQL|Redis|Kubernetes|GraphQL|REST|API|Linux|Bash|Shell|Jenkins|CI\/CD|Agile|Scrum|TDD|OOP|Machine Learning|AI|Data Science|Analytics|Excel|Tableau|Power BI|Salesforce|SAP|Oracle|\.NET|Angular|Vue|Django|Flask|Spring|Laravel|Express|FastAPI|Pandas|NumPy|TensorFlow|PyTorch|Scikit-learn|Spark|Hadoop|Kafka|RabbitMQ|Elasticsearch|Nginx|Apache|Azure|GCP|CloudFormation|Terraform|Ansible|Puppet|Chef|Prometheus|Grafana|Datadog|Splunk|New Relic|Selenium|Cypress|Jest|Mocha|JUnit|TestNG|Postman|Swagger|OAuth|JWT|SAML|LDAP|Active Directory|Networking|Security|Penetration Testing|Ethical Hacking|OWASP|CISSP|CEH|CompTIA|ITIL|PMP|Six Sigma|Lean)\b/gi);
-    if (commonSkills) {
-      skills.push(...[...new Set(commonSkills)].slice(0, 15));
-    }
+
+    // Common programming/technical skills pattern
+    const commonSkills = skillsText.match(/\b(?:JavaScript|TypeScript|Python|Java|React|Node\.js|SQL|AWS|Docker|Git|HTML|CSS|C\+\+|C\#|Ruby|Go|Rust|Swift|Kotlin|PHP|R|Scala|MongoDB|PostgreSQL|Redis|Kubernetes|GraphQL|REST|API|Linux|Bash|Shell|Jenkins|CI\/CD|Agile|Scrum|TDD|OOP|Machine Learning|AI|Data Science|Analytics|Excel|Tableau|Power BI|Salesforce|SAP|Oracle|\.NET|Angular|Vue|Django|Flask|Spring|Laravel|Express|FastAPI|Pandas|NumPy|TensorFlow|PyTorch|Scikit-learn|Spark|Hadoop|Kafka|RabbitMQ|Elasticsearch|Nginx|Apache|Azure|GCP|CloudFormation|Terraform|Ansible|Puppet|Chef|Prometheus|Grafana|Datadog|Splunk|New Relic|Selenium|Cypress|Jest|Mocha|JUnit|TestNG|Postman|Swagger|OAuth|JWT|SAML|LDAP|Active Directory|Networking|Security|Penetration Testing|Ethical Hacking|OWASP|CISSP|CEH|CompTIA|ITIL|PMP|Six Sigma|Lean)\b/gi);
+
+    // Hardware/embedded/FPGA specific skills
+    const hardwareSkills = skillsText.match(/\b(?:Verilog|VHDL|SystemVerilog|VLSI|FPGA|Xilinx|Altera|Intel|Vivado|Quartus|ModelSim|QuestaSim|Cadence|Synopsys|Mentor|ASIC|RTL|RISC-V|ARM|x86|MIPS|OpenCL|CUDA|Vitis|HLS|PCB|KiCad|Altium|Eagle|SPICE|LTspice|Oscilloscope|Logic Analyzer|JTAG|I2C|SPI|UART|USB|Ethernet|CAN|PCI|DDR|LPDDR|SRAM|Flash|EEPROM|Microcontroller|STM32|Arduino|Raspberry Pi|ESP32|Teensy|AVR|PIC|MSP430|DSP|ADC|DAC|PWM|Timer|Interrupt|DMA|GPIO|Firmware|Bootloader|RTOS|FreeRTOS|Zephyr|Embedded Linux|Yocto|Buildroot)\b/gi);
+
+    // Additional technical tools and frameworks
+    const toolsSkills = skillsText.match(/\b(?:GitHub|GitLab|Bitbucket|JIRA|Confluence|Slack|Teams|Zoom|VS Code|Visual Studio|IntelliJ|PyCharm|Eclipse|Vim|Emacs|Sublime|Atom|Notepad\+\+|Make|CMake|Gradle|Maven|npm|pip|conda|Webpack|Babel|ESLint|Prettier|SonarQube|Splunk|Nagios|Zabbix|Ansible|Puppet|Chef|Salt|Vagrant|VirtualBox|VMware|Hyper-V)\b/gi);
+
+    if (commonSkills) skills.push(...commonSkills);
+    if (hardwareSkills) skills.push(...hardwareSkills);
+    if (toolsSkills) skills.push(...toolsSkills);
+
+    // Remove duplicates and limit
+    const uniqueSkills = [...new Set(skills)];
+    skills.length = 0;
+    skills.push(...uniqueSkills.slice(0, 30));
   }
 
-  // Extract education
+  // Extract education (improved pattern)
   const education: string[] = [];
   const degree: string[] = [];
-  const eduMatch = text.match(/education:?\s*([^\n]+(?:\n(?!\n)[^\n]+)*)/i);
-  if (eduMatch) {
-    const eduText = eduMatch[1];
-    const universities = eduText.match(/\b(?:University|College|Institute|School)\s+(?:of\s+)?[\w\s]+/gi);
+
+  // Find education section more carefully
+  const eduSectionMatch = text.match(/(?:^|\n)education[:\s]*\n([\s\S]*?)(?=\n(?:professional|experience|work|skills|projects|extracurricular|summary|objective|certifications|publications|awards|languages|volunteer|references|$))/im);
+
+  if (eduSectionMatch) {
+    const eduText = eduSectionMatch[1];
+
+    // Extract universities
+    const universities = eduText.match(/(?:University|College|Institute|School)[^,\n]{0,50}/gi);
     if (universities) {
       education.push(...universities.slice(0, 3));
     }
-    const degrees = eduText.match(/\b(?:PhD|Ph\.D|Doctor|Master|M\.S\.|MS|M\.A\.|MA|MBA|Bachelor|B\.S\.|BS|B\.A\.|BA|Associate|A\.S\.|AS|A\.A\.|AA)\b[^,\n]*/gi);
-    if (degrees) {
-      degree.push(...degrees.slice(0, 3));
+
+    // Extract degrees with better pattern
+    const degreePatterns = [
+      /\b(?:PhD|Ph\.D\.?|Doctor(?:ate)?)\s+(?:in\s+|of\s+)?[\w\s]+/gi,
+      /\b(?:Master(?:'s)?|M\.S\.|MS|M\.A\.|MA|MBA)\s+(?:in\s+|of\s+)?[\w\s]+/gi,
+      /\b(?:Bachelor(?:'s)?|B\.S\.|BS|B\.A\.|BA)\s+(?:in\s+|of\s+)?[\w\s]+/gi,
+      /\b(?:Associate(?:'s)?|A\.S\.|AS|A\.A\.|AA)\s+(?:in\s+|of\s+)?[\w\s]+/gi,
+    ];
+
+    for (const pattern of degreePatterns) {
+      const matches = eduText.match(pattern);
+      if (matches) {
+        degree.push(...matches.slice(0, 2));
+      }
+    }
+
+    // If no degrees found with standard pattern, try simpler extraction
+    if (degree.length === 0) {
+      const simpleDegree = eduText.match(/(?:B\.S\.|BS|M\.S\.|MS|PhD|MBA|BA|MA)\s+[\w\s]+/gi);
+      if (simpleDegree) {
+        degree.push(...simpleDegree.slice(0, 2));
+      }
     }
   }
 
-  // Extract experience
+  // Extract experience (improved)
   const designation: string[] = [];
   const company_names: string[] = [];
-  const expMatch = text.match(/(?:experience|work history|employment):?\s*([^\n]+(?:\n(?!\n)[^\n]+)*)/i);
-  if (expMatch) {
-    const expText = expMatch[1];
-    const titles = expText.match(/\b(?:Senior|Junior|Lead|Principal|Staff|Chief|Head of|Director|Manager|Engineer|Developer|Designer|Analyst|Architect|Consultant|Specialist|Coordinator|Administrator|Technician|Scientist|Researcher)\s+[\w\s]+/gi);
-    if (titles) {
-      designation.push(...titles.slice(0, 5));
+
+  // Find professional experience section
+  const expSectionMatch = text.match(/(?:^|\n)(?:professional\s+)?(?:experience|work\s+(?:history|experience)|employment)[:\s]*\n([\s\S]*?)(?=\n(?:education|skills|projects|extracurricular|certifications|summary|volunteer|references|$))/im);
+
+  if (expSectionMatch) {
+    const expText = expSectionMatch[1];
+
+    // Extract job titles with better patterns
+    const titlePatterns = [
+      /\b(?:Senior|Junior|Lead|Principal|Staff|Associate|Chief)\s+(?:Software|Hardware|Electrical|Mechanical|Data|ML|AI|DevOps|Site Reliability|Full[- ]?Stack|Front[- ]?End|Back[- ]?End|Embedded|Firmware|FPGA|ASIC|VLSI|RTL|Verification|Design|Product|Project|Program)\s+Engineer/gi,
+      /\b(?:Senior|Junior|Lead|Principal|Staff|Associate)?\s*(?:Software|Hardware|Electrical|Mechanical|Data|ML|AI|DevOps)\s+(?:Engineer|Developer|Architect|Designer|Analyst|Scientist)/gi,
+      /\b(?:Chief|Head\s+of|Director\s+of|VP\s+of|Manager\s+of)\s+[\w\s]{3,30}/gi,
+      /\b(?:Intern|Internship|Co-op|Research\s+Assistant|Teaching\s+Assistant)/gi,
+    ];
+
+    for (const pattern of titlePatterns) {
+      const matches = expText.match(pattern);
+      if (matches) {
+        designation.push(...matches);
+      }
     }
+
+    // Extract company names (look for common patterns)
+    const companyPatterns = [
+      /(?:at|@)\s+([A-Z][A-Za-z0-9\s&]{2,30}(?:Inc\.?|LLC|Corp\.?|Corporation|Ltd\.?|Company|Co\.)?)/g,
+      /\b([A-Z][A-Za-z]{3,}(?:\s+[A-Z][A-Za-z]{3,})*)\s+(?:Inc\.?|LLC|Corp\.?|Corporation|Ltd\.?|Company|Co\.)/gi,
+    ];
+
+    for (const pattern of companyPatterns) {
+      const matches = [...expText.matchAll(pattern)];
+      for (const match of matches) {
+        if (match[1]) {
+          company_names.push(match[1].trim());
+        }
+      }
+    }
+
+    // Remove duplicates
+    const uniqueTitles = [...new Set(designation)];
+    designation.length = 0;
+    designation.push(...uniqueTitles.slice(0, 5));
+
+    const uniqueCompanies = [...new Set(company_names)];
+    company_names.length = 0;
+    company_names.push(...uniqueCompanies.slice(0, 5));
   }
 
   return {
