@@ -54,7 +54,27 @@ def test_python_setup():
             'error': str(e)
         }
 
-    # Test 4: Check file paths
+    # Test 4: Check NLTK data
+    try:
+        import nltk
+        # Try to find stopwords corpus
+        nltk.data.find('corpora/stopwords')
+        results['tests']['nltk_data'] = {
+            'status': 'OK',
+            'stopwords': 'found'
+        }
+    except LookupError as e:
+        results['tests']['nltk_data'] = {
+            'status': 'FAILED',
+            'error': 'NLTK stopwords corpus not found'
+        }
+    except Exception as e:
+        results['tests']['nltk_data'] = {
+            'status': 'FAILED',
+            'error': str(e)
+        }
+
+    # Test 5: Check file paths
     import os
     results['tests']['file_access'] = {
         'status': 'OK',

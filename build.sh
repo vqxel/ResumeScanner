@@ -9,6 +9,9 @@ npm install
 echo "🐍 Installing Python dependencies..."
 pip install -r requirements.txt
 
+echo "📥 Downloading NLTK data packages..."
+python3 scripts/download_nltk_data.py
+
 echo "📥 Downloading spaCy language model..."
 python3 -m spacy download en_core_web_sm
 

@@ -3,6 +3,8 @@
 
 pyresparser>=1.0.6
 spacy>=3.0.0
+nltk>=3.8
 
-# Note: After installing, run this to download the spaCy model:
-# python -m spacy download en_core_web_sm
+# Note: After installing, run:
+# 1. python -m spacy download en_core_web_sm
+# 2. python scripts/download_nltk_data.py
