@@ -56,7 +56,8 @@ async function runATSParser(
 
   // Original Python implementation (only runs if explicitly enabled)
   console.log('[ATS] Attempting to use Python parser...');
-  const tmpDir = join(process.cwd(), 'tmp');
+  // Use /tmp for Vercel compatibility (read-only filesystem except /tmp)
+  const tmpDir = '/tmp';
   const tmpFilePath = join(tmpDir, `resume-${Date.now()}.pdf`);
 
   try {
