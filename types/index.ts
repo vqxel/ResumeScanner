@@ -29,6 +29,8 @@ export interface AnalysisResult {
   pageCount: number;
   criticalIssues: string[];
   missingRequiredSections: string[];
+  parserUsed: 'python' | 'regex';
+  analysisMode: 'claude' | 'mock';
 }
 
 export interface AnalyzeResponse {

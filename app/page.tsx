@@ -278,6 +278,29 @@ export default function Home() {
         {/* Results Section */}
         {analysisResult && !isAnalyzing && (
           <div className="space-y-8">
+            {/* Analysis Info Badge */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                <span className="text-sm font-medium text-blue-900">Analysis Details:</span>
+                <div className="flex gap-2">
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    analysisResult.parserUsed === 'python'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {analysisResult.parserUsed === 'python' ? '🐍 Python ATS' : '⚡ Regex ATS'}
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    analysisResult.analysisMode === 'claude'
+                      ? 'bg-purple-100 text-purple-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {analysisResult.analysisMode === 'claude' ? '🤖 Claude AI' : '📝 Mock Data'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Critical Issues Alert */}
             {analysisResult.criticalIssues.length > 0 && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-6">

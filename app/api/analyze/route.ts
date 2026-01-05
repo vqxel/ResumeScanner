@@ -44,13 +44,18 @@ async function runATSParser(
   pdfBuffer: Buffer,
   resumeText: string,
   usePython: boolean = false
-): Promise<ATSData> {
+): Promise<{ data: ATSData; parserUsed: 'python' | 'regex'; error?: string }> {
   if (!usePython) {
     // Use fast fallback for Vercel (saves 2-5 seconds)
-    return createSmartFallbackATSData(resumeText);
+    console.log('[ATS] Using regex-based parser (Python disabled by user)');
+    return {
+      data: createSmartFallbackATSData(resumeText),
+      parserUsed: 'regex',
+    };
   }
 
   // Original Python implementation (only runs if explicitly enabled)
+  console.log('[ATS] Attempting to use Python parser...');
   const tmpDir = join(process.cwd(), 'tmp');
   const tmpFilePath = join(tmpDir, `resume-${Date.now()}.pdf`);
 
@@ -64,30 +69,49 @@ async function runATSParser(
     await writeFile(tmpFilePath, pdfBuffer);
 
     const pythonScript = join(process.cwd(), 'scripts', 'ats_parser.py');
+    console.log(`[ATS] Executing: python3 ${pythonScript} ${tmpFilePath}`);
+
     const { stdout, stderr } = await execAsync(`python3 ${pythonScript} ${tmpFilePath}`, {
       timeout: 5000, // Reduced to 5 second timeout
     });
 
     if (stderr && !stderr.includes('Warning')) {
-      console.error('Python script stderr:', stderr);
+      console.error('[ATS] Python script stderr:', stderr);
     }
+
+    console.log('[ATS] Python script output:', stdout.substring(0, 200));
 
     const result: ATSParserResult = JSON.parse(stdout);
 
     if (!result.success) {
-      return createSmartFallbackATSData(resumeText);
+      console.warn('[ATS] Python parser returned failure, using regex fallback:', result.error);
+      return {
+        data: createSmartFallbackATSData(resumeText),
+        parserUsed: 'regex',
+        error: `Python parser failed: ${result.error}`,
+      };
     }
 
-    return result.data!;
+    console.log('[ATS] Successfully used Python parser!');
+    return {
+      data: result.data!,
+      parserUsed: 'python',
+    };
 
   } catch (error) {
-    console.error('Error running ATS parser:', error);
-    return createSmartFallbackATSData(resumeText);
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[ATS] Error running Python parser:', errorMsg);
+    console.log('[ATS] Falling back to regex parser');
+    return {
+      data: createSmartFallbackATSData(resumeText),
+      parserUsed: 'regex',
+      error: `Failed to run Python parser: ${errorMsg}`,
+    };
   } finally {
     try {
       await unlink(tmpFilePath);
     } catch (err) {
-      console.error('Error deleting temp file:', err);
+      console.error('[ATS] Error deleting temp file:', err);
     }
   }
 }
@@ -341,19 +365,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Run ATS parser and Claude analysis in parallel (saves time!)
-    const [atsData, analysis] = await Promise.all([
+    const [atsResult, analysis] = await Promise.all([
       runATSParser(buffer, rawText, usePythonATS),
       analyzeResume(rawText, useClaudeAPI),
     ]);
 
+    // Add parser error to critical issues if it failed
+    if (atsResult.error) {
+      criticalIssues.push(atsResult.error);
+    }
+
+    console.log(`[Analysis] Parser used: ${atsResult.parserUsed}, Analysis mode: ${useClaudeAPI ? 'claude' : 'mock'}`);
+
     // Combine results
     const result: AnalysisResult = {
       grades: analysis.grades,
-      atsData,
+      atsData: atsResult.data,
       rawText,
       pageCount,
       criticalIssues: [...criticalIssues, ...analysis.criticalIssues],
       missingRequiredSections: analysis.missingRequiredSections,
+      parserUsed: atsResult.parserUsed,
+      analysisMode: useClaudeAPI ? 'claude' : 'mock',
     };
 
     return NextResponse.json({
