@@ -99,14 +99,20 @@ async function runATSParser(
       parserUsed: 'python',
     };
 
-  } catch (error) {
+  } catch (error: any) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    const stderr = error.stderr?.toString() || '';
+    const stdout = error.stdout?.toString() || '';
+
     console.error('[ATS] Error running Python parser:', errorMsg);
+    if (stderr) console.error('[ATS] Python stderr:', stderr);
+    if (stdout) console.error('[ATS] Python stdout:', stdout);
     console.log('[ATS] Falling back to regex parser');
+
     return {
       data: createSmartFallbackATSData(resumeText),
       parserUsed: 'regex',
-      error: `Failed to run Python parser: ${errorMsg}`,
+      error: `Failed to run Python parser: ${errorMsg}${stderr ? ` - ${stderr.substring(0, 200)}` : ''}`,
     };
   } finally {
     try {
