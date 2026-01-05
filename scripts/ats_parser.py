@@ -9,6 +9,9 @@ import json
 import os
 from typing import Dict, Any
 
+# Add detailed logging
+import traceback
+
 def parse_resume(pdf_path: str) -> Dict[str, Any]:
     """
     Parse resume using pyresparser and return structured data
@@ -47,46 +50,79 @@ def parse_resume(pdf_path: str) -> Dict[str, Any]:
         }
 
     except ImportError as e:
-        return {
+        error_details = {
             'success': False,
             'error': f'pyresparser not installed: {str(e)}',
+            'traceback': traceback.format_exc(),
             'fallback': True
         }
+        print(json.dumps(error_details), file=sys.stderr)
+        return error_details
     except Exception as e:
-        return {
+        error_details = {
             'success': False,
             'error': f'Error parsing resume: {str(e)}',
+            'error_type': type(e).__name__,
+            'traceback': traceback.format_exc(),
             'fallback': False
         }
+        print(json.dumps(error_details), file=sys.stderr)
+        return error_details
 
 
 def main():
     """Main entry point for the script"""
-    if len(sys.argv) != 2:
-        print(json.dumps({
+    try:
+        # Log startup
+        print(f"[DEBUG] Script started with args: {sys.argv}", file=sys.stderr)
+        print(f"[DEBUG] Python version: {sys.version}", file=sys.stderr)
+        print(f"[DEBUG] Working directory: {os.getcwd()}", file=sys.stderr)
+
+        if len(sys.argv) != 2:
+            error = {
+                'success': False,
+                'error': 'Usage: python ats_parser.py <pdf_path>'
+            }
+            print(json.dumps(error))
+            sys.exit(1)
+
+        pdf_path = sys.argv[1]
+        print(f"[DEBUG] PDF path: {pdf_path}", file=sys.stderr)
+
+        # Check if file exists
+        if not os.path.exists(pdf_path):
+            error = {
+                'success': False,
+                'error': f'File not found: {pdf_path}'
+            }
+            print(json.dumps(error))
+            sys.exit(1)
+
+        file_size = os.path.getsize(pdf_path)
+        print(f"[DEBUG] PDF file exists, size: {file_size} bytes", file=sys.stderr)
+
+        # Parse the resume
+        print(f"[DEBUG] Starting resume parsing...", file=sys.stderr)
+        result = parse_resume(pdf_path)
+        print(f"[DEBUG] Parsing completed. Success: {result.get('success')}", file=sys.stderr)
+
+        # Output JSON result
+        print(json.dumps(result, indent=2))
+
+        # Exit with appropriate code
+        sys.exit(0 if result['success'] else 1)
+
+    except Exception as e:
+        # Catch any uncaught exceptions
+        error = {
             'success': False,
-            'error': 'Usage: python ats_parser.py <pdf_path>'
-        }))
+            'error': f'Uncaught exception in main: {str(e)}',
+            'error_type': type(e).__name__,
+            'traceback': traceback.format_exc()
+        }
+        print(json.dumps(error), file=sys.stderr)
+        print(json.dumps(error))
         sys.exit(1)
-
-    pdf_path = sys.argv[1]
-
-    # Check if file exists
-    if not os.path.exists(pdf_path):
-        print(json.dumps({
-            'success': False,
-            'error': f'File not found: {pdf_path}'
-        }))
-        sys.exit(1)
-
-    # Parse the resume
-    result = parse_resume(pdf_path)
-
-    # Output JSON result
-    print(json.dumps(result, indent=2))
-
-    # Exit with appropriate code
-    sys.exit(0 if result['success'] else 1)
 
 
 if __name__ == '__main__':
