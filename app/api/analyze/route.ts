@@ -69,7 +69,7 @@ async function runATSParser(
 
     await writeFile(tmpFilePath, pdfBuffer);
 
-    const pythonScript = join(process.cwd(), 'scripts', 'ats_parser.py');
+    const pythonScript = join(process.cwd(), 'scripts', 'ats_parser_spacy.py');
     console.log(`[ATS] Executing: python3 ${pythonScript} ${tmpFilePath}`);
 
     const { stdout, stderr } = await execAsync(`python3 ${pythonScript} ${tmpFilePath}`, {

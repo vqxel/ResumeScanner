@@ -1,9 +1,9 @@
 # Python dependencies for ATS Resume Parser
 # Install with: pip install -r requirements.txt
 
-pyresparser>=1.0.6
 spacy>=3.0.0
 nltk>=3.8
+pdfminer.six>=20201018
 
 # Note: After installing, run:
 # 1. python -m spacy download en_core_web_sm
