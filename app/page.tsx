@@ -13,6 +13,10 @@ export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string>('');
 
+  // Toggle states
+  const [usePythonATS, setUsePythonATS] = useState(false);
+  const [useClaudeAPI, setUseClaudeAPI] = useState(false);
+
   const handleFileSelect = async (selectedFile: File) => {
     setFile(selectedFile);
     setError('');
@@ -29,6 +33,8 @@ export default function Home() {
     try {
       const formData = new FormData();
       formData.append('file', fileToAnalyze);
+      formData.append('usePythonATS', usePythonATS.toString());
+      formData.append('useClaudeAPI', useClaudeAPI.toString());
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -154,7 +160,81 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Upload Section */}
         {!file && !analysisResult && (
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto space-y-6">
+            {/* Configuration Toggles */}
+            <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Analysis Options</h2>
+              <div className="space-y-4">
+                {/* Python ATS Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <label htmlFor="python-ats" className="font-medium text-gray-700 cursor-pointer">
+                      Use Python ATS Parser
+                    </label>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {usePythonATS
+                        ? '⚠️ Slower but more accurate (requires Python dependencies)'
+                        : '✓ Fast regex-based extraction (2-3s faster)'}
+                    </p>
+                  </div>
+                  <button
+                    id="python-ats"
+                    type="button"
+                    onClick={() => setUsePythonATS(!usePythonATS)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 ${
+                      usePythonATS ? 'bg-primary-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        usePythonATS ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Claude API Toggle */}
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                  <div className="flex-1">
+                    <label htmlFor="claude-api" className="font-medium text-gray-700 cursor-pointer">
+                      Use Claude AI Analysis
+                    </label>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {useClaudeAPI
+                        ? '⚠️ Real AI feedback but slower (may timeout on Vercel free tier)'
+                        : '✓ Fast mock data with realistic feedback'}
+                    </p>
+                  </div>
+                  <button
+                    id="claude-api"
+                    type="button"
+                    onClick={() => setUseClaudeAPI(!useClaudeAPI)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 ${
+                      useClaudeAPI ? 'bg-primary-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        useClaudeAPI ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Warning for both enabled */}
+                {(usePythonATS || useClaudeAPI) && (
+                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      <strong>⚠️ Performance Warning:</strong> With these options enabled, analysis may take{' '}
+                      {usePythonATS && useClaudeAPI ? '10-15 seconds' : '5-10 seconds'} and could timeout on Vercel free tier.
+                      {useClaudeAPI && ' Ensure you have set ANTHROPIC_API_KEY in environment variables.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* File Upload */}
             <FileUpload onFileSelect={handleFileSelect} disabled={isAnalyzing} />
           </div>
         )}
@@ -184,7 +264,13 @@ export default function Home() {
               Analyzing your resume...
             </h2>
             <p className="text-gray-600">
-              This may take 10-30 seconds. We're extracting text, running ATS analysis, and evaluating your resume across 7 dimensions.
+              {usePythonATS && useClaudeAPI && 'Using Python ATS + Real Claude AI (10-15 seconds)'}
+              {usePythonATS && !useClaudeAPI && 'Using Python ATS + Mock Analysis (5-8 seconds)'}
+              {!usePythonATS && useClaudeAPI && 'Using Regex ATS + Real Claude AI (8-12 seconds)'}
+              {!usePythonATS && !useClaudeAPI && 'Using fast mode (2-3 seconds)'}
+            </p>
+            <p className="text-gray-500 text-sm mt-2">
+              Extracting text, running ATS analysis, and evaluating across 7 dimensions...
             </p>
           </div>
         )}

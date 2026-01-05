@@ -38,13 +38,14 @@ async function getPDFPageCount(buffer: Buffer): Promise<number> {
 
 /**
  * Run Python ATS parser on the PDF file (DISABLED for Vercel - use fast fallback instead)
- * To enable Python parsing, set USE_PYTHON_ATS=true in environment variables
+ * To enable Python parsing, pass usePython=true parameter
  */
-async function runATSParser(pdfBuffer: Buffer, resumeText: string): Promise<ATSData> {
-  // Check if Python ATS parsing is enabled
-  const usePythonATS = process.env.USE_PYTHON_ATS === 'true';
-
-  if (!usePythonATS) {
+async function runATSParser(
+  pdfBuffer: Buffer,
+  resumeText: string,
+  usePython: boolean = false
+): Promise<ATSData> {
+  if (!usePython) {
     // Use fast fallback for Vercel (saves 2-5 seconds)
     return createSmartFallbackATSData(resumeText);
   }
@@ -213,6 +214,10 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
+    // Get user preferences from form data
+    const usePythonATS = formData.get('usePythonATS') === 'true';
+    const useClaudeAPI = formData.get('useClaudeAPI') === 'true';
+
     if (!file) {
       return NextResponse.json(
         { success: false, error: 'No file provided' },
@@ -260,8 +265,8 @@ export async function POST(request: NextRequest) {
 
     // Run ATS parser and Claude analysis in parallel (saves time!)
     const [atsData, analysis] = await Promise.all([
-      runATSParser(buffer, rawText),
-      analyzeResume(rawText),
+      runATSParser(buffer, rawText, usePythonATS),
+      analyzeResume(rawText, useClaudeAPI),
     ]);
 
     // Combine results

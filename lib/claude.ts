@@ -98,12 +98,10 @@ interface ClaudeAnalysisResponse {
 }
 
 export async function analyzeResume(
-  resumeText: string
+  resumeText: string,
+  useRealAPI: boolean = false
 ): Promise<ClaudeAnalysisResponse> {
-  // Check if we should use mock data (for Vercel timeout issues)
-  const useMockAnalysis = process.env.USE_MOCK_ANALYSIS !== 'false';
-
-  if (useMockAnalysis) {
+  if (!useRealAPI) {
     // Return mock analysis data (instant response, no API call)
     console.log('Using mock analysis data to avoid timeout');
     return getMockAnalysis(resumeText);
