@@ -203,7 +203,7 @@ def extract_companies(text: str, doc) -> List[str]:
     edu_keywords = ['university', 'college', 'institute', 'school']
 
     for ent in doc.ents:
-        if ent.label() == 'ORG':
+        if ent.label_ == 'ORG':
             ent_lower = ent.text.lower()
             if not any(keyword in ent_lower for keyword in edu_keywords):
                 companies.append(ent.text)
