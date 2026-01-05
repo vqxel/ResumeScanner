@@ -149,31 +149,71 @@ def extract_education(text: str, doc) -> List[str]:
     """Extract educational institutions"""
     institutions = []
 
-    # Look for common education keywords
-    edu_keywords = ['university', 'college', 'institute', 'school']
+    # Look for education section
+    edu_match = re.search(
+        r'(?:^|\n)education[:\s]*\n([\s\S]*?)(?=\n(?:professional|experience|work|skills|projects|extracurricular|$))',
+        text,
+        re.IGNORECASE
+    )
 
-    for ent in doc.ents:
-        if ent.label_ == 'ORG':
-            ent_lower = ent.text.lower()
-            if any(keyword in ent_lower for keyword in edu_keywords):
-                institutions.append(ent.text)
+    if edu_match:
+        edu_text = edu_match.group(1)
 
-    return institutions[:5] if institutions else ['Not detected']
+        # Look for university names with common patterns
+        uni_patterns = [
+            r'University of [A-Z][a-z]+(?:,\s*[A-Z][a-z]+)?',  # University of California, Irvine
+            r'[A-Z][a-z]+\s+University',  # Stanford University
+            r'[A-Z][a-z]+\s+Institute of Technology',  # Massachusetts Institute of Technology
+            r'[A-Z][a-z]+\s+College',
+        ]
+
+        for pattern in uni_patterns:
+            matches = re.findall(pattern, edu_text)
+            institutions.extend(matches)
+
+    # Fallback: use spaCy NER but filter carefully
+    if not institutions:
+        edu_keywords = ['university', 'college', 'institute']
+        for ent in doc.ents:
+            if ent.label_ == 'ORG':
+                ent_lower = ent.text.lower()
+                if any(keyword in ent_lower for keyword in edu_keywords):
+                    # Avoid course codes and department names
+                    if not re.search(r'\b[A-Z]{2,4}\s*\d+', ent.text):
+                        institutions.append(ent.text)
+
+    return list(set(institutions))[:3] if institutions else ['Not detected']
 
 def extract_degrees(text: str) -> List[str]:
     """Extract degree information"""
+    degrees = []
+
+    # Look for education section first
+    edu_match = re.search(
+        r'(?:^|\n)education[:\s]*\n([\s\S]*?)(?=\n(?:professional|experience|work|skills|projects|extracurricular|$))',
+        text,
+        re.IGNORECASE
+    )
+
+    search_text = edu_match.group(1) if edu_match else text
+
+    # Improved degree patterns
     degree_patterns = [
-        r'\b(B\.?S\.?|Bachelor|B\.?A\.?|B\.?E\.?|B\.?Tech\.?)\s+(?:in|of)?\s+[\w\s]+',
-        r'\b(M\.?S\.?|Master|M\.?A\.?|M\.?E\.?|M\.?Tech\.?|MBA)\s+(?:in|of)?\s+[\w\s]+',
-        r'\b(Ph\.?D\.?|Doctorate)\s+(?:in|of)?\s+[\w\s]+',
+        r'(B\.?S\.?)\s+(?:in\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\s+Engineering)?)',  # B.S. Electrical Engineering
+        r'(B\.?A\.?|B\.?E\.?|B\.?Tech\.?)\s+(?:in\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+        r'(M\.?S\.?|M\.?A\.?|M\.?E\.?|M\.?Tech\.?|MBA)\s+(?:in\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+        r'(Ph\.?D\.?|Doctorate)\s+(?:in\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+        r'(Bachelor|Master|Doctor)(?:\'s)?\s+(?:of|in)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
     ]
 
-    degrees = []
     for pattern in degree_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        degrees.extend([m if isinstance(m, str) else m[0] for m in matches])
+        matches = re.findall(pattern, search_text, re.IGNORECASE)
+        for match in matches:
+            if isinstance(match, tuple):
+                degree = f"{match[0]} {match[1]}" if len(match) > 1 else match[0]
+                degrees.append(degree.strip())
 
-    return degrees[:5] if degrees else ['Not detected']
+    return list(set(degrees))[:5] if degrees else ['Not detected']
 
 def extract_designations(doc) -> List[str]:
     """Extract job titles/designations"""
@@ -196,19 +236,36 @@ def extract_designations(doc) -> List[str]:
     return job_titles[:5] if job_titles else []
 
 def extract_companies(text: str, doc) -> List[str]:
-    """Extract company names"""
+    """Extract company names from work experience section"""
     companies = []
 
-    # Skip educational institutions
+    # Skip educational institutions and course-related terms
     edu_keywords = ['university', 'college', 'institute', 'school']
+    course_keywords = ['design', 'logic', 'computer', 'arithmetic', 'digital']
 
     for ent in doc.ents:
         if ent.label_ == 'ORG':
             ent_lower = ent.text.lower()
-            if not any(keyword in ent_lower for keyword in edu_keywords):
-                companies.append(ent.text)
 
-    return companies[:10] if companies else []
+            # Skip educational institutions
+            if any(keyword in ent_lower for keyword in edu_keywords):
+                continue
+
+            # Skip course codes (e.g., "EECS 31", "CS 112")
+            if re.search(r'\b[A-Z]{2,4}\s*\d+', ent.text):
+                continue
+
+            # Skip course/class names (long phrases with common course keywords)
+            if any(keyword in ent_lower for keyword in course_keywords) and len(ent.text.split()) > 3:
+                continue
+
+            # Skip if it's just "Engineering" or similar generic terms
+            if ent.text.lower() in ['engineering', 'electrical engineering', 'computer', 'design']:
+                continue
+
+            companies.append(ent.text)
+
+    return list(set(companies))[:10] if companies else []
 
 def extract_experience(text: str, doc) -> List[str]:
     """Extract work experience descriptions"""
