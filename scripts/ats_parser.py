@@ -13,6 +13,13 @@ from typing import Dict, Any
 import traceback
 import time
 
+# Configure NLTK data path BEFORE any imports that use NLTK
+import nltk
+nltk_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'nltk_data')
+if os.path.exists(nltk_data_dir) and nltk_data_dir not in nltk.data.path:
+    nltk.data.path.insert(0, nltk_data_dir)
+    print(f"[DEBUG] Added NLTK data path: {nltk_data_dir}", file=sys.stderr)
+
 def parse_resume(pdf_path: str) -> Dict[str, Any]:
     """
     Parse resume using pyresparser and return structured data
