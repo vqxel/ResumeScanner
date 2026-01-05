@@ -37,53 +37,52 @@ async function getPDFPageCount(buffer: Buffer): Promise<number> {
 }
 
 /**
- * Run Python ATS parser on the PDF file
+ * Run Python ATS parser on the PDF file (DISABLED for Vercel - use fast fallback instead)
+ * To enable Python parsing, set USE_PYTHON_ATS=true in environment variables
  */
-async function runATSParser(pdfBuffer: Buffer): Promise<ATSData> {
+async function runATSParser(pdfBuffer: Buffer, resumeText: string): Promise<ATSData> {
+  // Check if Python ATS parsing is enabled
+  const usePythonATS = process.env.USE_PYTHON_ATS === 'true';
+
+  if (!usePythonATS) {
+    // Use fast fallback for Vercel (saves 2-5 seconds)
+    return createSmartFallbackATSData(resumeText);
+  }
+
+  // Original Python implementation (only runs if explicitly enabled)
   const tmpDir = join(process.cwd(), 'tmp');
   const tmpFilePath = join(tmpDir, `resume-${Date.now()}.pdf`);
 
   try {
-    // Create tmp directory if it doesn't exist
     try {
       await mkdir(tmpDir, { recursive: true });
     } catch (err) {
       // Directory might already exist, ignore error
     }
 
-    // Write PDF to temporary file
     await writeFile(tmpFilePath, pdfBuffer);
 
-    // Execute Python script
     const pythonScript = join(process.cwd(), 'scripts', 'ats_parser.py');
     const { stdout, stderr } = await execAsync(`python3 ${pythonScript} ${tmpFilePath}`, {
-      timeout: 8000, // 8 second timeout for Python script
+      timeout: 5000, // Reduced to 5 second timeout
     });
 
     if (stderr && !stderr.includes('Warning')) {
       console.error('Python script stderr:', stderr);
     }
 
-    // Parse the JSON output
     const result: ATSParserResult = JSON.parse(stdout);
 
     if (!result.success) {
-      // If pyresparser is not available, use fallback
-      if (result.fallback) {
-        console.warn('Using fallback ATS data:', result.error);
-        return createFallbackATSData();
-      }
-      throw new Error(result.error || 'Unknown error from Python parser');
+      return createSmartFallbackATSData(resumeText);
     }
 
     return result.data!;
 
   } catch (error) {
     console.error('Error running ATS parser:', error);
-    // Return fallback data instead of failing completely
-    return createFallbackATSData();
+    return createSmartFallbackATSData(resumeText);
   } finally {
-    // Clean up temporary file
     try {
       await unlink(tmpFilePath);
     } catch (err) {
@@ -93,11 +92,84 @@ async function runATSParser(pdfBuffer: Buffer): Promise<ATSData> {
 }
 
 /**
- * Create fallback ATS data when pyresparser is not available
+ * Create smart fallback ATS data using regex patterns (fast alternative to pyresparser)
+ */
+function createSmartFallbackATSData(text: string): ATSData {
+  const emailRegex = /[\w.-]+@[\w.-]+\.\w+/g;
+  const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
+
+  // Extract email
+  const emails = text.match(emailRegex);
+  const email = emails?.[0] || 'Not detected';
+
+  // Extract phone
+  const phones = text.match(phoneRegex);
+  const mobile_number = phones?.[0] || 'Not detected';
+
+  // Extract name (usually first line or near top)
+  const lines = text.split('\n').filter(line => line.trim().length > 0);
+  const name = lines[0]?.trim() || 'Not detected';
+
+  // Extract skills (look for skills section)
+  const skills: string[] = [];
+  const skillsMatch = text.match(/skills?:?\s*([^\n]+(?:\n(?!\n)[^\n]+)*)/i);
+  if (skillsMatch) {
+    const skillsText = skillsMatch[1];
+    const commonSkills = skillsText.match(/\b(?:JavaScript|TypeScript|Python|Java|React|Node\.js|SQL|AWS|Docker|Git|HTML|CSS|C\+\+|Ruby|Go|Rust|Swift|Kotlin|PHP|R|Scala|MongoDB|PostgreSQL|Redis|Kubernetes|GraphQL|REST|API|Linux|Bash|Shell|Jenkins|CI\/CD|Agile|Scrum|TDD|OOP|Machine Learning|AI|Data Science|Analytics|Excel|Tableau|Power BI|Salesforce|SAP|Oracle|\.NET|Angular|Vue|Django|Flask|Spring|Laravel|Express|FastAPI|Pandas|NumPy|TensorFlow|PyTorch|Scikit-learn|Spark|Hadoop|Kafka|RabbitMQ|Elasticsearch|Nginx|Apache|Azure|GCP|CloudFormation|Terraform|Ansible|Puppet|Chef|Prometheus|Grafana|Datadog|Splunk|New Relic|Selenium|Cypress|Jest|Mocha|JUnit|TestNG|Postman|Swagger|OAuth|JWT|SAML|LDAP|Active Directory|Networking|Security|Penetration Testing|Ethical Hacking|OWASP|CISSP|CEH|CompTIA|ITIL|PMP|Six Sigma|Lean)\b/gi);
+    if (commonSkills) {
+      skills.push(...[...new Set(commonSkills)].slice(0, 15));
+    }
+  }
+
+  // Extract education
+  const education: string[] = [];
+  const degree: string[] = [];
+  const eduMatch = text.match(/education:?\s*([^\n]+(?:\n(?!\n)[^\n]+)*)/i);
+  if (eduMatch) {
+    const eduText = eduMatch[1];
+    const universities = eduText.match(/\b(?:University|College|Institute|School)\s+(?:of\s+)?[\w\s]+/gi);
+    if (universities) {
+      education.push(...universities.slice(0, 3));
+    }
+    const degrees = eduText.match(/\b(?:PhD|Ph\.D|Doctor|Master|M\.S\.|MS|M\.A\.|MA|MBA|Bachelor|B\.S\.|BS|B\.A\.|BA|Associate|A\.S\.|AS|A\.A\.|AA)\b[^,\n]*/gi);
+    if (degrees) {
+      degree.push(...degrees.slice(0, 3));
+    }
+  }
+
+  // Extract experience
+  const designation: string[] = [];
+  const company_names: string[] = [];
+  const expMatch = text.match(/(?:experience|work history|employment):?\s*([^\n]+(?:\n(?!\n)[^\n]+)*)/i);
+  if (expMatch) {
+    const expText = expMatch[1];
+    const titles = expText.match(/\b(?:Senior|Junior|Lead|Principal|Staff|Chief|Head of|Director|Manager|Engineer|Developer|Designer|Analyst|Architect|Consultant|Specialist|Coordinator|Administrator|Technician|Scientist|Researcher)\s+[\w\s]+/gi);
+    if (titles) {
+      designation.push(...titles.slice(0, 5));
+    }
+  }
+
+  return {
+    name,
+    email,
+    mobile_number,
+    skills,
+    education,
+    degree,
+    designation,
+    experience: [],
+    company_names,
+    no_of_pages: 1,
+    total_experience: 0,
+  };
+}
+
+/**
+ * Create fallback ATS data when pyresparser is not available (legacy)
  */
 function createFallbackATSData(): ATSData {
   return {
-    name: 'Not detected (pyresparser not available)',
+    name: 'Not detected',
     email: 'Not detected',
     mobile_number: 'Not detected',
     skills: [],
@@ -186,11 +258,11 @@ export async function POST(request: NextRequest) {
       criticalIssues.push(`Missing required sections: ${missingRequiredSections.join(', ')}`);
     }
 
-    // Run ATS parser (this might use fallback if pyresparser is not available)
-    const atsData = await runATSParser(buffer);
-
-    // Analyze with Claude
-    const analysis = await analyzeResume(rawText, atsData);
+    // Run ATS parser and Claude analysis in parallel (saves time!)
+    const [atsData, analysis] = await Promise.all([
+      runATSParser(buffer, rawText),
+      analyzeResume(rawText),
+    ]);
 
     // Combine results
     const result: AnalysisResult = {

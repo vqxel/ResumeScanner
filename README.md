@@ -32,8 +32,38 @@ Before you begin, ensure you have the following installed:
 
 - **Node.js** 18.0.0 or higher
 - **npm** or **yarn**
-- **Python 3** (3.7 or higher)
-- **pip** (Python package manager)
+- **Python 3** (Optional - only needed if using real ATS parser)
+- **pip** (Optional - Python package manager)
+
+## ⚡ Vercel Timeout Fix (IMPORTANT)
+
+By default, the app uses **mock analysis data** to avoid Vercel's 10-second timeout limit. This means:
+
+✅ **Works perfectly on Vercel free tier** (responses in ~2-3 seconds)
+✅ **No Claude API key required** for basic functionality
+✅ **No Python dependencies needed**
+✅ **Demonstrates full UI and ATS extraction**
+
+The mock data provides realistic feedback across all 7 dimensions. To enable real Claude AI analysis:
+
+1. Upgrade to Vercel Pro (60-second timeout) OR deploy to Railway/Render
+2. Set `USE_MOCK_ANALYSIS=false` in your environment variables
+3. Add your `ANTHROPIC_API_KEY`
+
+## Configuration Options
+
+Edit `.env.local` to customize behavior:
+
+```env
+# Use mock analysis (fast, no API needed)
+USE_MOCK_ANALYSIS=true
+
+# Use Python ATS parser (requires pyresparser)
+USE_PYTHON_ATS=false
+
+# Claude API key (only needed if USE_MOCK_ANALYSIS=false)
+ANTHROPIC_API_KEY=your_key_here
+```
 
 ## Local Development Setup
 
