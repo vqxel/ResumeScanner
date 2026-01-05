@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: resume-analyzer
+    env: node
+    buildCommand: bash build.sh
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: USE_MOCK_ANALYSIS
+        value: "false"
+      - key: USE_PYTHON_ATS
+        value: "true"
+    plan: free
