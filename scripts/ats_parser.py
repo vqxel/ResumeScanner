@@ -11,6 +11,7 @@ from typing import Dict, Any
 
 # Add detailed logging
 import traceback
+import time
 
 def parse_resume(pdf_path: str) -> Dict[str, Any]:
     """
@@ -24,10 +25,18 @@ def parse_resume(pdf_path: str) -> Dict[str, Any]:
     """
     try:
         # Import pyresparser (lazy import to allow script to fail gracefully)
+        print(f"[DEBUG] Importing pyresparser...", file=sys.stderr)
+        start_time = time.time()
         from pyresparser import ResumeParser
+        import_time = time.time() - start_time
+        print(f"[DEBUG] pyresparser imported in {import_time:.2f}s", file=sys.stderr)
 
         # Parse the resume
+        print(f"[DEBUG] Calling ResumeParser.get_extracted_data()...", file=sys.stderr)
+        parse_start = time.time()
         data = ResumeParser(pdf_path).get_extracted_data()
+        parse_time = time.time() - parse_start
+        print(f"[DEBUG] Resume parsed in {parse_time:.2f}s", file=sys.stderr)
 
         # Clean and structure the data
         structured_data = {

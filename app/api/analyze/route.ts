@@ -73,7 +73,7 @@ async function runATSParser(
     console.log(`[ATS] Executing: python3 ${pythonScript} ${tmpFilePath}`);
 
     const { stdout, stderr } = await execAsync(`python3 ${pythonScript} ${tmpFilePath}`, {
-      timeout: 5000, // Reduced to 5 second timeout
+      timeout: 60000, // Increased to 60 seconds for pyresparser initial load
     });
 
     if (stderr && !stderr.includes('Warning')) {
