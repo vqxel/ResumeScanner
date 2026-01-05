@@ -14,15 +14,16 @@ def test_python_setup():
         'tests': {}
     }
 
-    # Test 1: Import pyresparser
+    # Test 1: Import pdfminer (for PDF text extraction)
     try:
-        import pyresparser
-        results['tests']['pyresparser'] = {
+        import pdfminer
+        from pdfminer.high_level import extract_text
+        results['tests']['pdfminer'] = {
             'status': 'OK',
-            'version': getattr(pyresparser, '__version__', 'unknown')
+            'version': getattr(pdfminer, '__version__', 'installed')
         }
     except Exception as e:
-        results['tests']['pyresparser'] = {
+        results['tests']['pdfminer'] = {
             'status': 'FAILED',
             'error': str(e)
         }
